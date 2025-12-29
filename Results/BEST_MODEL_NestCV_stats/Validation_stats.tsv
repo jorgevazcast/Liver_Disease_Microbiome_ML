@@ -1,0 +1,9 @@
+Stats_name	Stats
+AUC	0.914666666666667
+accuracy	0.85
+kappa	0.68
+MCC	0.68
+F1_score	0.88
+sensitivity	0.88
+specificity	0.8
+precision	0.88

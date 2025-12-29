@@ -13,6 +13,7 @@ Scripts for Implementing different Machine Learning Algorithms in R using the ca
 - [ ] [cvAUC](https://cran.r-project.org/web/packages/cvAUC/index.html) 
 - [ ] [ggplot2](https://cran.r-project.org/web/packages/ggplot2/index.html) 
 - [ ] [ggpubr](https://cran.r-project.org/web/packages/ggpubr/index.html) 
+- [ ] [DMwR](https://cran.r-project.org/src/contrib/Archive/DMwR/) 
 
 # Classification
 The best model is selected based on the one the maximize the AUC
