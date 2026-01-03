@@ -1,6 +1,11 @@
 # MLPredictR
 Scripts for Implementing different Machine Learning Algorithms in R using the caret Library. The repository is currently under development, and additional algorithms may be included in the future. At present, it features implementations of Random Forest, GLMNet, and XGBoost, along with scripts for running these algorithms on Zeus (specifically for XGBoost).
 
+# With alt text and caption
+![ML Classification Pipeline](images/Raw_pipeline.png)
+*Figure 1: Nested cross-validation framework for microbiome classification*
+
+
 ## Requirements
 
 - [ ] [caret](https://cran.r-project.org/web/packages/caret/index.html)

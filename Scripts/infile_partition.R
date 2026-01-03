@@ -24,7 +24,7 @@ all_phylo <- prune_samples(rownames(Metadata), all_phylo)
 all_taxa <- taxa_sums(all_phylo)
 all_phylo <- prune_taxa(names(all_taxa[all_taxa != 0]), all_phylo)
 
-# Create stratified 80/20 split
+# Create stratified split
 holdout_index <- createDataPartition(
     y = Metadata$Variable, 
     p = hold_out_size, 
@@ -37,10 +37,10 @@ holdout_phylo <- prune_samples(rownames(Metadata)[holdout_index], all_phylo)
 # Remove taxa with zero abundance in each set separately
 # (some taxa may become zero after split)
 all_taxa <- taxa_sums(training_phylo)
-training_phylo <- prune_taxa(names(all_taxa[all_taxa != 0]), training_phylo)
+#training_phylo <- prune_taxa(names(all_taxa[all_taxa != 0]), training_phylo)
 
 all_taxa <- taxa_sums(holdout_phylo)
-holdout_phylo <- prune_taxa(names(all_taxa[all_taxa != 0]), holdout_phylo)
+#holdout_phylo <- prune_taxa(names(all_taxa[all_taxa != 0]), holdout_phylo)
 
 # Create output directory and save
 dir.create("infiles", showWarnings = FALSE)

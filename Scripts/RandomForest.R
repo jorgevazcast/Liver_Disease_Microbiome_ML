@@ -11,11 +11,11 @@ library(DMwR)
 
 args<-commandArgs(TRUE)
 
-infile <- as.character(args[1]) #     infile <- "/home/luna.kuleuven.be/u0141268/Dropbox/Jiyeon_Jorge/research/research_liver_diseases/Meta_analysis/ML_predictions/infiles_case_controls/cirrhosis_species_abd_adj_prop_phyloseq.rds"
-Variable <- as.character(args[2]) #     Variable <- "normal_vs_cirrhosis"
-PrevCutoff <- as.numeric(args[3]) # PrevCutoff <-  0.2
-Feature_selection <- as.logical(args[4]) # Feature_selection <- T
-ncores  <- as.numeric(args[5]) # ncores <-  15    ncores <-3
+infile <- as.character(args[1]) #     infile <- "./infiles/phylo_training_set.rds"
+Variable <- as.character(args[2]) #     Variable <- "condition"
+PrevCutoff <- as.numeric(as.character(args[3])) # PrevCutoff <-  0.1
+Feature_selection <- as.logical(as.character(args[4])) # Feature_selection <- T
+ncores  <- as.numeric(as.character(args[5])) # ncores <-  15    ncores <-3
 simple_training_params = F
 print(infile)
 print(Variable)
@@ -156,7 +156,7 @@ importance_df <- data.frame()
 #for(outer in names(outer_loop)){
 for(i in seq_along(names(outer_loop))){
 
-	# outer <- "Fold01"  Fold1  i<-1
+	# outer <- "Fold01"  Fold1  i<-7
 	outer <- names(outer_loop)[i]	
 	cat("Training",outer," Feature selection ",Feature_selection,"\n")
 	
@@ -232,7 +232,18 @@ for(i in seq_along(names(outer_loop))){
 
 	##############################################
 	##### Save the importance for each model #####
-	importance_df <- rbind(  importance_df , data.frame( outer, Feature = rownames(varImp(Fit_model)$importance) , varImp(Fit_model)$importance) )	
+	
+	# Check number of features before calculating variable importance
+	# varImp() fails with a single feature (returns NaN)
+	n_features <- length(Fit_model$coefnames)
+
+	if(n_features > 1){
+	    # Multiple features - calculate importance normally
+	    importance_df <- rbind(importance_df, data.frame(outer, Feature = rownames(varImp(Fit_model)$importance), varImp(Fit_model)$importance))
+	} else {
+	    # Single feature - assign 100% importance by default
+	    importance_df <- rbind(importance_df, data.frame(outer, Feature = Fit_model$coefnames, Overall = 100))
+	}
 
 	##########################
 	##### Save the stats #####	
@@ -252,6 +263,23 @@ saveRDS(file= "stats_model.rds",stats_model)
 write.table(stats_model,"stats_model.tsv",col.names=T,row.names = F,quote=FALSE,sep = "\t")
 
 saveRDS(file= "pooled_outer_loop_cv_predictions.rds",pooled_outer_loop_cv_predictions)
+
+### Save the stats and plots for the pooled apprach
+if( class(MEspDF$Variable) == "factor" | class(MEspDF$Variable) == "character"  ){
+
+	stats_pooled_model <- stats_model_func_discrete(PredProbs=pooled_outer_loop_cv_predictions[,3:4], 
+		PredClass=pooled_outer_loop_cv_predictions$Predictec, RealClass = pooled_outer_loop_cv_predictions$Real, return_data.frame = T )
+	write.table(stats_pooled_model,"stats_pooled_model.tsv",col.names=T,row.names = F,quote=FALSE,sep = "\t")	
+	saveRDS(file= "stats_pooled_model.rds",stats_pooled_model)
+
+	p_roc <- plot_roc_simple_curve(PredProbs = pooled_outer_loop_cv_predictions[,3:4], 
+		PredClass = pooled_outer_loop_cv_predictions$Predictec, RealClass=pooled_outer_loop_cv_predictions$Real, 
+		mcc_value = stats_pooled_model$MCC)
+
+	p_roc <- p_roc + labs(title = "Pooled outer loop cv ROC Curve")
+	ggsave("pooled_outer_loop_roc_curve.pdf", p_roc, width = 7, height = 7)
+	saveRDS(file="pooled_outer_loop_roc_curve.rds",p_roc)
+}
 
 ###################################################################################################################################
 ##############################              Average performance metrics in the outer-loop               ###########################

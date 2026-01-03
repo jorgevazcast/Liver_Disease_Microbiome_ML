@@ -188,16 +188,32 @@ stats_model_func_continuous <- function(FitModel = NA , Test_df = data.frame(), 
 
 }
 
-stats_model_func_discrete <- function(FitModel = NA, Test_df = data.frame(), return_data.frame = T ){
+# Calculate classification metrics (AUC, accuracy, kappa, MCC, F1, sensitivity, specificity, precision)
+# Two usage modes:
+#   1) Pass FitModel + Test_df: predictions are generated internally
+#   2) Pass PredProbs + PredClass + RealClass: use pre-computed predictions (set FitModel = NA)
+stats_model_func_discrete <- function(FitModel = NA, Test_df = data.frame(), return_data.frame = T, PredProbs=NA, PredClass=NA, RealClass = NA ){
+	
+	if(all(is.na(FitModel)) & !all(is.na(PredProbs)) & !all(is.na(PredClass)) & !all(is.na(RealClass)) ){
+		pred_probs <- PredProbs
+		pred_class <- PredClass
+								
+	}else if( !all(is.na(FitModel)) & nrow(Test_df) != 0){
+		#pred_probs <- predict(FitModel, Test_df, type = "prob")
+		#pred_class <- predict(FitModel, Test_df)
+		pred_probs <- predict_ML(indf = Test_df, MLmodel = FitModel, prop = T )		
+		pred_class <- predict_ML(indf = Test_df, MLmodel = FitModel, prop = F )		
+		RealClass <- Test_df$Variable
+		
+	}
 
-	pred_probs <- predict(FitModel, Test_df, type = "prob")
-	pred_class <- predict(FitModel, Test_df)
+	if( class(RealClass) == "character" ){ RealClass <- factor(RealClass) }
 
-	if( length(unique(Test_df$Variable)) == 2 ){
-		roc_curve <- pROC::roc(Test_df$Variable, pred_probs[, 2], levels = levels(Test_df$Variable))
+	if( length(unique(RealClass)) == 2 ){
+		roc_curve <- pROC::roc(RealClass, pred_probs[, 2], levels = levels(RealClass))
 		auc_value <- as.numeric(pROC::auc(roc_curve))
 	}else{
-		classes <- levels(Test_df$Variable)
+		classes <- levels(RealClass)
 		roc_list <- list()
 		auc_list <- numeric(length(classes))
 		names(auc_list) <- classes
@@ -206,7 +222,7 @@ stats_model_func_discrete <- function(FitModel = NA, Test_df = data.frame(), ret
 			this_class <- classes[i]
 		  
 			# Create binary labels: 1 for this class, 0 for all others
-			binary_response <- ifelse(Test_df$Variable == this_class, 1, 0)
+			binary_response <- ifelse(RealClass == this_class, 1, 0)
 		  
 			# Get predicted probabilities for this class
 			this_prob <- pred_probs[, this_class]  # assuming pred_probs has column names matching classes
@@ -221,14 +237,14 @@ stats_model_func_discrete <- function(FitModel = NA, Test_df = data.frame(), ret
 	#print(auc_value)
 	
 	# Confusion Matrix for Accuracy and Kappa
-	conf_matrix <- confusionMatrix(pred_class, Test_df$Variable)
+	conf_matrix <- confusionMatrix(pred_class, RealClass)
 	accuracy <- conf_matrix$overall["Accuracy"]
 	kappa <- conf_matrix$overall["Kappa"]
 	MCC <- Matt_Coef(conf_matrix)
 	F1 <- F1_Score(conf_matrix)
 
 
-	if( length(unique(Test_df$Variable)) == 2 ){
+	if( length(unique(RealClass)) == 2 ){
 		sensitivity <- conf_matrix$byClass["Sensitivity"]
 		specificity <- conf_matrix$byClass["Specificity"]
 		precision <- conf_matrix$byClass["Precision"]
@@ -264,6 +280,7 @@ stats_model_func_discrete <- function(FitModel = NA, Test_df = data.frame(), ret
 }
 
 
+
 stats_model_func <- function(Fit.Model = NA, Test.df = data.frame(), RetDF = T, df_complete = data.frame() ){
 
 	if(is.factor(Test.df$Variable)){
@@ -284,8 +301,26 @@ stats_model_func <- function(Fit.Model = NA, Test.df = data.frame(), RetDF = T, 
 ##################################################
 ##### PLOT FUNCTIONS FOR binary classifiers  #####
 
+plot_roc_simple_curve <- function(PredProbs, PredClass, RealClass, mcc_value){
+	# ROC curve
+	roc_curve <- pROC::roc(RealClass, PredProbs[,2], levels = levels(RealClass))
+	auc_value <- as.numeric(pROC::auc(roc_curve))
+	
+	# Create ROC plot
+	p_roc <- ggroc(roc_curve, size = 1.2, color = "steelblue") +
+		geom_abline(intercept = 1, slope = 1, linetype = "dashed", color = "gray50") +
+	    annotate("text", x = 0.2, y = 0.15, label = paste0("AUC = ", round(auc_value, 3)), size = 5) +
+	    annotate("text", x = 0.2, y = 0.1, label = paste0("MCC = ", round(mcc_value, 3)), size = 5) +
+	    theme_bw(base_size = 12) +
+	    labs(title = "ROC Curve", x = "Specificity", y = "Sensitivity") +
+	    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+	return(p_roc)
+}
+
 plot_auc_function <- function(list_ggroc_curves=list(), list_ggroc_auc = c() , Variable = "",  Categories_variable = c() ){
 
+	list_sd_roc_figures <- list()
+	sum_plots <- 1
 	#### AUC mean and standar deviation #####
 	if(length(Categories_variable) == 2){		
 		mean_ROC_list <- mean_ROC_function(list_ggroc_curves, Variable)
@@ -298,7 +333,8 @@ plot_auc_function <- function(list_ggroc_curves=list(), list_ggroc_auc = c() , V
 				subtitle = paste("Mean =", round(mean(list_ggroc_auc),digits=2) , "SD =", round(sd(list_ggroc_auc),digits=2) ) 
 			  )
 		ggsave(file = paste0(Variable,"_mean_sd_AUC.pdf"), AUCMeanAUCsd, width = 10, height = 7)
-
+		list_sd_roc_figures[[sum_plots]] <- AUCMeanAUCsd
+				
 		#### AUC lines #####
 		names(list_ggroc_curves) <- paste("CV",1:length(list_ggroc_curves))
 		AUCplotLines <- ggroc(list_ggroc_curves)
@@ -307,6 +343,7 @@ plot_auc_function <- function(list_ggroc_curves=list(), list_ggroc_auc = c() , V
 				subtitle = paste("Mean =", round(mean(list_ggroc_auc),digits=2) , "SD =", round(sd(list_ggroc_auc),digits=2) ) ) + 
 			  theme_bw()  # + scale_x_continuous(limits = c(0, 1))
 		ggsave(file = paste0(Variable,"_AUC_CV_lines.pdf"), AUCplotLines, width = 10, height = 7)
+
 
 	}else{
 		### Obtain the AUC curve per categorie
@@ -335,7 +372,9 @@ plot_auc_function <- function(list_ggroc_curves=list(), list_ggroc_auc = c() , V
 					"SD =", round(sd(temp_list_ggroc_auc),digits=2) ) )
 			
 			ggsave(file = paste0(i,"_mean_sd_AUC.pdf"), AUCMeanAUCsd, width = 10, height = 7)
-
+			
+			sum_plots <- sum_plots + 1
+			list_sd_roc_figures[[sum_plots]] <- AUCMeanAUCsd
 
 			#### AUC lines #####
 			names(temp_list_ggroc_curves) <- paste("CV",1:length(temp_list_ggroc_curves))
@@ -353,7 +392,7 @@ plot_auc_function <- function(list_ggroc_curves=list(), list_ggroc_auc = c() , V
 
 
 	}
-
+	saveRDS(file="ROC_sd_curves.rds",list_sd_roc_figures)
 }
 
 mean_ROC_function <- function(list_ggroc_curves, Variable){
@@ -515,52 +554,75 @@ data_format <- function(in.obj, Variable,PrevCutoff = 0.2){
 }
 
 
-cont_res_wt <- function(subDF = data.frame(),discrete = "",continuous = "", Paired = F){
-	subDF <- subDF[,match(c(discrete,continuous), colnames(subDF))]
-	colnames(subDF) <-c("discrete","continuous")
+cont_res_wt <- function(subDF = data.frame(), discrete = "", continuous = "", Paired = F, ID = NULL){
+	
+	# Check if ID is required for paired test
+	if(Paired && is.null(ID)){
+		stop("Paired = TRUE requires ID column to ensure correct sample pairing")
+	}
+	
+	# Select columns based on whether ID is provided
+	if(!is.null(ID)){
+		subDF <- subDF[, match(c(discrete, continuous, ID), colnames(subDF))]
+		colnames(subDF) <- c("discrete", "continuous", "ID")
+	} else {
+		subDF <- subDF[, match(c(discrete, continuous), colnames(subDF))]
+		colnames(subDF) <- c("discrete", "continuous")
+	}
+	
 	subDF <- subDF[complete.cases(subDF),]
 	subDF$discrete <- factor(subDF$discrete)
-
-	if(Paired == T ){ WT <- wilcox.test(continuous ~ discrete, data = subDF,paired = T)  }	
-	if(Paired == F ){ WT <- wilcox.test(continuous ~ discrete, data = subDF,paired = F)  }	
 	
-	WT <- wilcox.test(continuous ~ discrete, data = subDF)
 	level1 = levels(subDF$discrete)[1]
 	level2 = levels(subDF$discrete)[2]
 	
-	mean.level1 <-mean(subDF[subDF$discrete == level1,"continuous"])
-	median.level1 <-median(subDF[subDF$discrete == level1,"continuous"])
-	sd.level1 <-sd(subDF[subDF$discrete == level1,"continuous"])
-
-	DFlevel1 <- subDF[subDF$discrete == level1,]
-	DFlevel1 <- DFlevel1[complete.cases(DFlevel1),]
-        N_level1 <- nrow(DFlevel1)
-        
-	mean.level2 <-mean(subDF[subDF$discrete == level2,"continuous"])
-	median.level2 <-median(subDF[subDF$discrete == level2,"continuous"])
-	sd.level2 <-sd(subDF[subDF$discrete == level2,"continuous"])  	
-
-	DFlevel2 <- subDF[subDF$discrete == level2,]
-	DFlevel2 <- DFlevel2[complete.cases(DFlevel2),]
-        N_level2 <- nrow(DFlevel2)
-
-	#####   Estimate the effect size	#####
+	# Split by group
+	df1 <- subDF[subDF$discrete == level1, ]
+	df2 <- subDF[subDF$discrete == level2, ]
+	
+	# If paired, sort by ID to ensure correct pairing
+	if(Paired){
+		df1 <- df1[order(df1$ID), ]
+		df2 <- df2[order(df2$ID), ]
+		
+		# Verify same IDs in both groups
+		if(!identical(df1$ID, df2$ID)){
+			stop("Paired test requires same IDs in both groups")
+		}
+	}
+	
+	group1 <- df1$continuous
+	group2 <- df2$continuous
+	
+	WT <- wilcox.test(group1, group2, paired = Paired)
+	
+	mean.level1 <- mean(group1)
+	median.level1 <- median(group1)
+	sd.level1 <- sd(group1)
+	N_level1 <- length(group1)
+	
+	mean.level2 <- mean(group2)
+	median.level2 <- median(group2)
+	sd.level2 <- sd(group2)
+	N_level2 <- length(group2)
+	
+	#####   Estimate the effect size   #####
 	Z <- statistic(independence_test(continuous ~ discrete, data = subDF), type = "standardized")	
-	N <- nrow(subDF)  # Total number of observations
+	N <- nrow(subDF)
 	EffectSize_r <- c(abs(Z) / sqrt(N))
 	names(EffectSize_r) <- "EffectSize_r"
 	
 	if(median.level1 != median.level2){
-		Dominant <- ifelse(median.level1 - median.level2 > 0, as.character(level1),as.character(level2))	
-	}else if(mean.level1 != mean.level2){
-		Dominant <- ifelse(mean.level1 - mean.level2 > 0, as.character(level1),as.character(level2))		
-	}else{
+		Dominant <- ifelse(median.level1 - median.level2 > 0, as.character(level1), as.character(level2))	
+	} else if(mean.level1 != mean.level2){
+		Dominant <- ifelse(mean.level1 - mean.level2 > 0, as.character(level1), as.character(level2))		
+	} else {
 		Dominant <- "Undetermined"
 	}
 	
-	retDF<-data.frame(Discrete=discrete,Continuous=continuous,Level1=level1, N_level1,Level2=level2,N_level2,
-		mean.level1,mean.level2,median.level1,median.level2,sd.level1,sd.level2,
-		statistic=WT$statistic,EffectSize_r,p.value=WT$p.value, N=nrow(subDF),Dominant)
+	retDF <- data.frame(Discrete = discrete, Continuous = continuous, Level1 = level1, N_level1, Level2 = level2, N_level2,
+		mean.level1, mean.level2, median.level1, median.level2, sd.level1, sd.level2,
+		statistic = WT$statistic, EffectSize_r, p.value = WT$p.value, N = nrow(subDF), Dominant)
 	return(retDF)
 }
 
@@ -594,13 +656,23 @@ cont_res_kw <- function(subDF = data.frame(),discrete = "",continuous = ""){
 	return(retDF)
 }
 
-predict_ML <- function(phylo.obj , MLmodel, prop = F){
+predict_ML <- function(phylo.obj = NULL, indf = data.frame(), MLmodel, prop = F){
 
-	in.df <-   data.frame(t(otu_table(phylo.obj)))
+	if( !is.null(phylo.obj) & nrow(indf) == 0 ){
+		in.df <- data.frame(t(otu_table(phylo.obj)))
+		if (!taxa_are_rows(phylo.obj)) { in.df <- data.frame(t(in.df)) }	
+	} else if( is.null(phylo.obj) & nrow(indf) != 0 ){
+		in.df <- indf
+	} else {
+		stop("Provide either phylo.obj OR indf, not both or neither")
+	}
+
 	#####################################
 	### remove the cohort unique taxa ###
 	cohort_specific_taxa <- setdiff(colnames(in.df), colnames(MLmodel$trainingData)) 
-	in.df <- in.df[,!colnames(in.df) %in% cohort_specific_taxa] ### Corrected
+	if(length(cohort_specific_taxa) > 0){
+	    in.df <- in.df[, !colnames(in.df) %in% cohort_specific_taxa, drop = FALSE]
+	}
 
 	############################
 	### Add the missing taxa ###
@@ -615,7 +687,7 @@ predict_ML <- function(phylo.obj , MLmodel, prop = F){
 	### Match the taxa ####
 	Taxa2Match <- colnames(MLmodel$trainingData) 
 	Taxa2Match <- Taxa2Match[!Taxa2Match %in% c(".outcome")]
-	df2predict <- df2predict[,match( Taxa2Match , colnames(df2predict) ) ]
+	df2predict <- df2predict[, match(Taxa2Match, colnames(df2predict)), drop = FALSE]
 	
 	#Richness <- richness(phylo.obj)
 	#Richness <- Richness[match(rownames(df2predict),rownames(Richness)),]
@@ -746,6 +818,54 @@ feature_selection <- function( List_models = list(), cutoff = 0.5 ){
     
 	Prev_CV <- table(all_features)  / length(List_models)
 	return(Prev_CV[Prev_CV > cutoff])
+}
+
+feature_selection_adaptive <- function(List_models = list(), cutoffs = c(0.6, 0.5, 0.4, 0.3)) {
+  # Adaptive feature selection with decreasing cutoff thresholds
+  #
+  # Attempts to select features starting from the highest cutoff.
+  # If no features pass the threshold, it automatically decreases
+ # to the next cutoff level.
+  #
+  # Args:
+  #   List_models: list of trained caret models from CV folds
+  #   cutoffs: numeric vector of thresholds to try (descending order)
+  #
+  # Returns:
+  #   Named numeric vector with selected features and their prevalence
+  
+  # === TRY EACH CUTOFF IN ORDER ===
+  for(cutoff in cutoffs) {
+    Best_features <- feature_selection(List_models, cutoff = cutoff)
+    
+    if(length(Best_features) > 0) {
+      # Success: features found at this cutoff
+      cat("Features selected with cutoff =", cutoff, ":", length(Best_features), "\n")
+      return(Best_features)
+    } else {
+      # No features passed: warn and try lower cutoff
+      warning(paste0("Cutoff ", cutoff, " selected no features. Lowering threshold..."))
+    }
+  }
+  
+  # === FALLBACK: TOP 10 FEATURES ===
+  # If no cutoff worked, return most frequent features
+  warning("No cutoff worked. Returning top 10 features by prevalence.")
+  
+  # Collect all features across models
+  all_features <- c()
+  for(i in seq_along(List_models)) {  
+    Model <- List_models[[i]]
+    Features <- colnames(Model$trainingData)
+    Features <- Features[!Features %in% ".outcome"]
+    all_features <- c(all_features, Features)
+  }
+  
+  # Calculate prevalence and return top 10
+  Prev_CV <- table(all_features) / length(List_models)
+  Prev_CV <- sort(Prev_CV, decreasing = TRUE)
+  
+  return(head(Prev_CV, 10))
 }
 
 ####################################################
@@ -1038,7 +1158,7 @@ train_final_model <- function(Best_features = c(), df_best_hyperparameter = data
   
 	# Handle class imbalance if needed
 	if (isTRUE(is_imbalanced)) { 
-		cat("\n Data balanced \n")
+		cat("\n Data imbalance \n")
 		Train_selected <- smart_smote(data = DF_TRAIN) 
 		BEST_MODEL <- train(Variable ~ ., data = Train_selected, method = ML_method, trControl = fitControl, tuneGrid = df_best_hyperparameter)
 	} else {

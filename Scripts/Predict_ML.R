@@ -7,16 +7,17 @@ library(ggplot2)
 
 args<-commandArgs(TRUE)
 
-infile <- as.character(args[1]) #     infile <- "/home/luna.kuleuven.be/u0141268/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Test_data/infiles/phylo_holdout_validation_set.rds"
-Variable <- as.character(args[2]) #     Variable <- "normal_vs_cirrhosis"
-Model_file <- as.character(args[3]) #     Model_file <- "/home/luna.kuleuven.be/u0141268/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/RandomForest_FS_TRUE/BEST_MODEL_FULL.rds"
+infile <- as.character(args[1]) #     infile <- "./infiles/phylo_holdout_validation_set.rds"
+Variable <- as.character(args[2]) #     Variable <- "normal_vs_cirrhosis"   Variable <- "condition"
+Model_file <- as.character(args[3]) #     Model_file <- "./RandomForest_FS_TRUE/BEST_MODEL_outerloop_performance.rds"
 PrevCutoff <- 0
-OutDir <- as.character(args[4]) 
+OutDir <- as.character(args[4])  # OutDir <- "BEST_MODEL_outerloop_performance_stats"
 #######################################################################################################################################
 ##########################################              Load the functions                       ######################################
 #######################################################################################################################################
 
-#path_functions <- "/home/luna.kuleuven.be/u0141268/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Functions"
+# path_functions <- "/home/luna.kuleuven.be/u0141268/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Functions"
+# path_functions <- "/raeslab/scratch/jorvaz/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Functions" 
 path_functions  <- as.character(args[5]) 
 source(paste0(path_functions,"/Machine_learning_functions.R"))
 
@@ -72,11 +73,14 @@ write.table(Ret_stats,"Validation_stats.tsv",col.names=T,row.names = F,quote=FAL
 #######################################################################################################################################
 
 # Predictions
-PredRF_VAR <- predict(Fit_model, newdata = MEspDF)
-PredRFProb <- predict(Fit_model, newdata = MEspDF, type = "prob")
+Pred_VAR <- predict(Fit_model, newdata = MEspDF)
+names(Pred_VAR) <- rownames(MEspDF)
+Pred_Prob <- predict(Fit_model, newdata = MEspDF, type = "prob")
+
+all( names(Pred_VAR) == rownames(Pred_Prob)  )
 
 # ROC curve
-roc_curve <- pROC::roc(MEspDF$Variable, PredRFProb[, 2],  levels = levels(MEspDF$Variable))
+roc_curve <- pROC::roc(MEspDF$Variable, Pred_Prob[, 2],  levels = levels(MEspDF$Variable))
 auc_value <- as.numeric(pROC::auc(roc_curve))
 
 # Extract MCC from stats
@@ -107,7 +111,7 @@ cat("ROC curve saved to: ROC_curve_validation.pdf\n")
 #######################################################################################################################################
 
 # Create confusion matrix
-conf_matrix <- confusionMatrix(PredRF_VAR, MEspDF$Variable)
+conf_matrix <- confusionMatrix(Pred_VAR, MEspDF$Variable)
 
 # Extract table
 conf_table <- as.data.frame.matrix(conf_matrix$table)
@@ -128,7 +132,7 @@ cat("\nConfusion matrix saved to: Confusion_Matrix_validation_dataset.tsv\n\n")
 ##########################################              Save a list with all the stats              ##########################################
 ##############################################################################################################################################
 
-List_stats_validation_dataset <- list(conf_matrix = conf_matrix, Stats=tempStats, ROC_curve= p_roc)
+List_stats_validation_dataset <- list(conf_matrix = conf_matrix, Stats=tempStats, ROC_curve= p_roc, Pred_VAR = Pred_VAR, Pred_Prob = Pred_Prob)
 saveRDS(file="List_stats_validation_dataset.rds",List_stats_validation_dataset)
 
 	

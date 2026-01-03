@@ -10,9 +10,9 @@ library(DMwR)
 
 args<-commandArgs(TRUE)
 
-infile <- as.character(args[1]) #     infile <- "/home/luna.kuleuven.be/u0141268/Dropbox/Jiyeon_Jorge/research/research_liver_diseases/Meta_analysis/ML_predictions/infiles_case_controls/cirrhosis_species_abd_adj_prop_phyloseq.rds"  infile <- "/home/luna.kuleuven.be/u0141268/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Results/infiles/phylo_training_set.rds"
-Variable <- as.character(args[2]) #     Variable <- "normal_vs_cirrhosis"
-PrevCutoff <- as.numeric(args[3]) # PrevCutoff <-  0.2
+infile <- as.character(args[1]) #     infile <- "./infiles/phylo_training_set.rds"
+Variable <- as.character(args[2]) #     Variable <- "condition"
+PrevCutoff <- as.numeric(args[3]) # PrevCutoff <-  0.1
 ncores  <- as.numeric(args[4]) # ncores <-  15
 
 print(infile)
@@ -21,6 +21,7 @@ print(PrevCutoff)
 print(ncores)
 
 # path_functions <- "/home/luna.kuleuven.be/u0141268/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Functions"
+# path_functions <- "/raeslab/scratch/jorvaz/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Functions" 
 path_functions  <- as.character(args[5]) 
 source(paste0(path_functions,"/Machine_learning_functions.R"))
 
@@ -119,7 +120,7 @@ doParallel::registerDoParallel(cl)
 #### Criterion 1: MODE hyperparameter values across models and Feature selected ####
 stats_model <- readRDS("stats_model.rds")
 df_best_hyperparameter <- best_hyperparameter_selection(List_models = list_CV_models , Performance = stats_model, tie_threshold = 0.01, verbose = TRUE  )
-Best_features <- feature_selection( List_models = list_CV_models, cutoff = 0.6 )
+Best_features <- feature_selection_adaptive( List_models = list_CV_models, cutoffs = c( 0.6, 0.5, 0.4, 0.3) )
 
 # Train the model
 BEST_MODEL_NestCV_common_features <- train_final_model(Best_features = names(Best_features), df_best_hyperparameter = df_best_hyperparameter, 
