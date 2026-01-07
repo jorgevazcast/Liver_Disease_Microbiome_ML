@@ -8,8 +8,8 @@ library(ggplot2)
 args<-commandArgs(TRUE)
 
 infile <- as.character(args[1]) #     infile <- "./infiles/phylo_holdout_validation_set.rds"
-Variable <- as.character(args[2]) #     Variable <- "normal_vs_cirrhosis"   Variable <- "condition"
-Model_file <- as.character(args[3]) #     Model_file <- "./RandomForest_FS_TRUE/BEST_MODEL_outerloop_performance.rds"
+Variable <- as.character(args[2]) #   Variable <- "condition"
+Model_file <- as.character(args[3]) #  Model_file <- "./RandomForest_FS_TRUE/BEST_MODEL_outerloop_performance.rds"
 PrevCutoff <- 0
 OutDir <- as.character(args[4])  # OutDir <- "BEST_MODEL_outerloop_performance_stats"
 #######################################################################################################################################
@@ -76,35 +76,78 @@ write.table(Ret_stats,"Validation_stats.tsv",col.names=T,row.names = F,quote=FAL
 Pred_VAR <- predict(Fit_model, newdata = MEspDF)
 names(Pred_VAR) <- rownames(MEspDF)
 Pred_Prob <- predict(Fit_model, newdata = MEspDF, type = "prob")
+all(names(Pred_VAR) == rownames(Pred_Prob))
 
-all( names(Pred_VAR) == rownames(Pred_Prob)  )
+# ROC curve (works for 2 or more classes)
+n_classes <- length(levels(factor(MEspDF$Variable)))
 
-# ROC curve
-roc_curve <- pROC::roc(MEspDF$Variable, Pred_Prob[, 2],  levels = levels(MEspDF$Variable))
-auc_value <- as.numeric(pROC::auc(roc_curve))
+if (n_classes == 2) {
+	# Binary ROC
+	roc_curve <- pROC::roc(MEspDF$Variable, Pred_Prob[, 2], levels = levels(MEspDF$Variable), quiet = TRUE)
+	auc_value <- as.numeric(pROC::auc(roc_curve))
+	mcc_value <- tempStats$MCC
+	
+	p_roc <- pROC::ggroc(roc_curve, size = 1.2, color = "steelblue") +
+		geom_abline(intercept = 1, slope = 1, linetype = "dashed", color = "gray50") +
+		annotate("text", x = 0.2, y = 0.15, label = paste0("AUC = ", round(auc_value, 3)), size = 5) +
+		annotate("text", x = 0.2, y = 0.10, label = paste0("MCC = ", round(mcc_value, 3)), size = 5) +
+		theme_bw() +
+		labs(title = "ROC Curve", x = "Specificity", y = "Sensitivity")
+	
+} else {
+	# Multiclass ROC (One-vs-Rest)
+	classes <- levels(factor(MEspDF$Variable))
+	colnames(Pred_Prob) <- classes
+	
+	roc_list <- list()
+	auc_list <- c()
+	mcc_list <- c()
+	
+	for (this_class in classes) {
+		# ROC and AUC
+		binary_response <- ifelse(MEspDF$Variable == this_class, 1, 0)
+		roc_list[[this_class]] <- pROC::roc(binary_response, Pred_Prob[, this_class], quiet = TRUE)
+		auc_list[this_class] <- as.numeric(pROC::auc(roc_list[[this_class]]))
+		
+		# MCC per class (One-vs-Rest)
+		binary_pred <- ifelse(Pred_VAR == this_class, 1, 0)
+		TP <- sum(binary_response == 1 & binary_pred == 1)
+		TN <- sum(binary_response == 0 & binary_pred == 0)
+		FP <- sum(binary_response == 0 & binary_pred == 1)
+		FN <- sum(binary_response == 1 & binary_pred == 0)
+		
+		denom_parts <- c((TP + FP), (TP + FN), (TN + FP), (TN + FN))
+		if (any(denom_parts == 0)) {
+			mcc_list[this_class] <- 0
+		} else {
+			mcc_list[this_class] <- ((TP * TN) - (FP * FN)) / sqrt(prod(denom_parts))
+		}
+	}
+	
+	median_auc <- median(auc_list)
+	median_mcc <- median(mcc_list)
+	
+	# Legend labels with AUC and MCC per class
+	legend_labels <- paste0(
+		gsub("Enterotype\\.", "", classes),
+		" (AUC=", round(auc_list, 2), ", MCC=", round(mcc_list, 2), ")"
+	)
+	names(legend_labels) <- classes
+	
+	p_roc <- pROC::ggroc(roc_list, size = 1) +
+		geom_abline(intercept = 1, slope = 1, linetype = "dashed", color = "gray50") +
+		annotate("text", x = 0.3, y = 0.15, 
+			label = paste0("Median AUC = ", round(median_auc, 3), "\nMedian MCC = ", round(median_mcc, 3)), 
+			size = 4, hjust = 0) +
+		theme_bw() +
+		labs(title = "ROC Curve (One-vs-Rest)", x = "Specificity", y = "Sensitivity", color = "Class") +
+		theme(legend.position = "right") +
+		scale_color_brewer(palette = "Set1", labels = legend_labels)
+}
 
-# Extract MCC from stats
-mcc_value <- tempStats$MCC
-
-# Prepare ROC data for ggplot
-roc_data <- data.frame(
-    sensitivity = roc_curve$sensitivities,
-    specificity = roc_curve$specificities
-)
-
-# Create ROC plot
-p_roc <- ggroc(roc_curve, size = 1.2, color = "steelblue") +
-	geom_abline(intercept = 1, slope = 1, linetype = "dashed", color = "gray50") +
-    annotate("text", x = 0.2, y = 0.15, label = paste0("AUC = ", round(auc_value, 3)), size = 5 ) +
-    annotate("text", x = 0.2, y = 0.1, label = paste0("MCC = ", round(mcc_value, 3)), size = 5 ) +
-    theme_bw(base_size = 12) +
-    labs(title = "ROC Curve - Validation Set",x = "Specificity",y = "Sensitivity") +
-    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
-
-
-
-ggsave("ROC_curve_validation.pdf", p_roc, width = 7, height = 7)
+ggsave("ROC_curve_validation.pdf", p_roc, width = 12, height = 9)
 cat("ROC curve saved to: ROC_curve_validation.pdf\n")
+
 
 #######################################################################################################################################
 ##########################################              Confusion Matrix                         ######################################

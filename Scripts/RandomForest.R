@@ -11,11 +11,11 @@ library(DMwR)
 
 args<-commandArgs(TRUE)
 
-infile <- as.character(args[1]) #     infile <- "./infiles/phylo_training_set.rds"
+infile <- as.character(args[1]) #     infile <- "./Test_data/infiles/phylo_training_set.rds"
 Variable <- as.character(args[2]) #     Variable <- "condition"
 PrevCutoff <- as.numeric(as.character(args[3])) # PrevCutoff <-  0.1
 Feature_selection <- as.logical(as.character(args[4])) # Feature_selection <- T
-ncores  <- as.numeric(as.character(args[5])) # ncores <-  15    ncores <-3
+ncores  <- as.numeric(as.character(args[5])) # ncores <-  15
 simple_training_params = F
 print(infile)
 print(Variable)
@@ -267,17 +267,32 @@ saveRDS(file= "pooled_outer_loop_cv_predictions.rds",pooled_outer_loop_cv_predic
 ### Save the stats and plots for the pooled apprach
 if( class(MEspDF$Variable) == "factor" | class(MEspDF$Variable) == "character"  ){
 
-	stats_pooled_model <- stats_model_func_discrete(PredProbs=pooled_outer_loop_cv_predictions[,3:4], 
-		PredClass=pooled_outer_loop_cv_predictions$Predictec, RealClass = pooled_outer_loop_cv_predictions$Real, return_data.frame = T )
-	write.table(stats_pooled_model,"stats_pooled_model.tsv",col.names=T,row.names = F,quote=FALSE,sep = "\t")	
-	saveRDS(file= "stats_pooled_model.rds",stats_pooled_model)
-
-	p_roc <- plot_roc_simple_curve(PredProbs = pooled_outer_loop_cv_predictions[,3:4], 
-		PredClass = pooled_outer_loop_cv_predictions$Predictec, RealClass=pooled_outer_loop_cv_predictions$Real, 
-		mcc_value = stats_pooled_model$MCC)
+	# Detect number of classes and select probability columns dynamically
+	n_classes <- length(unique(pooled_outer_loop_cv_predictions$Real))
+	prob_cols <- 3:(2 + n_classes)
+	
+	# Fix column names to match class levels
+	colnames(pooled_outer_loop_cv_predictions)[prob_cols] <- levels(factor(pooled_outer_loop_cv_predictions$Real))
+	
+	# Calculate stats
+	stats_pooled_model <- stats_model_func_discrete(
+		PredProbs = pooled_outer_loop_cv_predictions[, prob_cols], 
+		PredClass = pooled_outer_loop_cv_predictions$Predictec, 
+		RealClass = pooled_outer_loop_cv_predictions$Real, 
+		return_data.frame = TRUE
+	)
+	write.table(stats_pooled_model, "stats_pooled_model.tsv", col.names = TRUE, row.names = FALSE, quote = FALSE, sep = "\t")
+	saveRDS(stats_pooled_model, file = "stats_pooled_model.rds")
+	
+	p_roc <- plot_roc_simple_curve(
+		PredProbs = pooled_outer_loop_cv_predictions[, prob_cols], 
+		PredClass = pooled_outer_loop_cv_predictions$Predictec, 
+		RealClass = pooled_outer_loop_cv_predictions$Real, 
+		mcc_value = stats_pooled_model$MCC
+	)
 
 	p_roc <- p_roc + labs(title = "Pooled outer loop cv ROC Curve")
-	ggsave("pooled_outer_loop_roc_curve.pdf", p_roc, width = 7, height = 7)
+	ggsave("pooled_outer_loop_roc_curve.pdf", p_roc, width = 12, height = 7)
 	saveRDS(file="pooled_outer_loop_roc_curve.rds",p_roc)
 }
 

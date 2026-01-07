@@ -63,11 +63,11 @@ Predict_ML=$HOMEC"/github_shared_code_and_publications/Liver_Disease_Microbiome_
 
 # Input phyloseq object (.rds format)
 # Should contain microbiome abundance data and metadata with target variable
-infile=/home/luna.kuleuven.be/u0141268/Dropbox/Jiyeon_Jorge/research/research_liver_diseases/Meta_analysis/ML_predictions/infiles_case_controls/cirrhosis_species_abd_adj_prop_phyloseq.rds
+infile=../Test_data/in_phylo.rds
 
 # Target variable for classification
 # Must match a column name in the phyloseq metadata
-Variable="normal_vs_cirrhosis"
+Variable="condition"
 
 ####################################################################################
 #                     Parition dataset                                             #

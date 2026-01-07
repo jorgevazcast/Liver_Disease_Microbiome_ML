@@ -9,6 +9,7 @@ library(phyloseq)
 library(cvAUC)
 library(coin)    
 library(DMwR)
+library(rstatix)
 
 #XGboost_param_matrix <- function(Matrix = "xgbGrid_mid"){
 
@@ -199,16 +200,13 @@ stats_model_func_discrete <- function(FitModel = NA, Test_df = data.frame(), ret
 		pred_class <- PredClass
 								
 	}else if( !all(is.na(FitModel)) & nrow(Test_df) != 0){
-		#pred_probs <- predict(FitModel, Test_df, type = "prob")
-		#pred_class <- predict(FitModel, Test_df)
 		pred_probs <- predict_ML(indf = Test_df, MLmodel = FitModel, prop = T )		
 		pred_class <- predict_ML(indf = Test_df, MLmodel = FitModel, prop = F )		
 		RealClass <- Test_df$Variable
-		
 	}
-
+	
 	if( class(RealClass) == "character" ){ RealClass <- factor(RealClass) }
-
+	
 	if( length(unique(RealClass)) == 2 ){
 		roc_curve <- pROC::roc(RealClass, pred_probs[, 2], levels = levels(RealClass))
 		auc_value <- as.numeric(pROC::auc(roc_curve))
@@ -217,66 +215,63 @@ stats_model_func_discrete <- function(FitModel = NA, Test_df = data.frame(), ret
 		roc_list <- list()
 		auc_list <- numeric(length(classes))
 		names(auc_list) <- classes
-
 		for (i in seq_along(classes)) {
 			this_class <- classes[i]
-		  
-			# Create binary labels: 1 for this class, 0 for all others
 			binary_response <- ifelse(RealClass == this_class, 1, 0)
-		  
-			# Get predicted probabilities for this class
-			this_prob <- pred_probs[, this_class]  # assuming pred_probs has column names matching classes
-		  
-			# Compute ROC
+			this_prob <- pred_probs[, this_class]
 			roc_obj <- roc(binary_response, this_prob)
 			roc_list[[this_class]] <- roc_obj
 			auc_list[this_class] <- auc(roc_obj)
 		}
-
 	}
-	#print(auc_value)
 	
-	# Confusion Matrix for Accuracy and Kappa
+	# Confusion Matrix
 	conf_matrix <- confusionMatrix(pred_class, RealClass)
 	accuracy <- conf_matrix$overall["Accuracy"]
 	kappa <- conf_matrix$overall["Kappa"]
 	MCC <- Matt_Coef(conf_matrix)
 	F1 <- F1_Score(conf_matrix)
-
-
+	
 	if( length(unique(RealClass)) == 2 ){
 		sensitivity <- conf_matrix$byClass["Sensitivity"]
 		specificity <- conf_matrix$byClass["Specificity"]
 		precision <- conf_matrix$byClass["Precision"]
+		PPV <- conf_matrix$byClass["Pos Pred Value"]  # = Precision
+		NPV <- conf_matrix$byClass["Neg Pred Value"]
 	
-		Stats <- c(auc_value, accuracy, kappa, MCC, F1, sensitivity, specificity, precision) 	
-		names(Stats) <- c("AUC","accuracy","kappa","MCC","F1_score","sensitivity","specificity","precision")
+		Stats <- c(auc_value, accuracy, kappa, MCC, F1, sensitivity, specificity, precision, PPV, NPV) 	
+		names(Stats) <- c("AUC","accuracy","kappa","MCC","F1_score","sensitivity","specificity","precision","PPV","NPV")
+		
 	}else{
-
 		sensitivity_list <- conf_matrix$byClass[,"Sensitivity"]
 		specificity_list <- conf_matrix$byClass[,"Specificity"]
 		precision_list <- conf_matrix$byClass[,"Precision"]
-
+		PPV_list <- conf_matrix$byClass[,"Pos Pred Value"]
+		NPV_list <- conf_matrix$byClass[,"Neg Pred Value"]
+		
 		auc_value <- median(auc_list, na.rm=T)
 		sensitivity <- median(sensitivity_list, na.rm=T)
 		specificity <- median(specificity_list, na.rm=T)
 		precision <- median(precision_list, na.rm=T)
+		PPV <- median(PPV_list, na.rm=T)
+		NPV <- median(NPV_list, na.rm=T)
 		
 		names(auc_list) <- paste0("AUC.",names(auc_list))
 		names(sensitivity_list) <- gsub("Class: ","sens.",names(sensitivity_list))
 		names(specificity_list) <- gsub("Class: ","spec.",names(specificity_list))											
-		names(precision_list) <- gsub("Class: ","prec.",names(precision_list))											
+		names(precision_list) <- gsub("Class: ","prec.",names(precision_list))
+		names(PPV_list) <- gsub("Class: ","PPV.",names(PPV_list))
+		names(NPV_list) <- gsub("Class: ","NPV.",names(NPV_list))
 																
-		Stats <- c(auc_value, accuracy, kappa, MCC, F1, sensitivity, specificity, precision) 	
-		names(Stats) <- c("AUC","accuracy","kappa","MCC","F1_score","sensitivity","specificity","precision")
+		Stats <- c(auc_value, accuracy, kappa, MCC, F1, sensitivity, specificity, precision, PPV, NPV) 	
+		names(Stats) <- c("AUC","accuracy","kappa","MCC","F1_score","sensitivity","specificity","precision","PPV","NPV")
 		
-		## Add the values per categorie
-		Stats <- c( Stats , c(auc_list,sensitivity_list,specificity_list,precision_list))		
+		## Add values per category
+		Stats <- c(Stats, c(auc_list, sensitivity_list, specificity_list, precision_list, PPV_list, NPV_list))		
 	}	
 		
-	if(return_data.frame  == T){ Stats <- data.frame(t(as(Stats,"matrix")))}
+	if(return_data.frame == T){ Stats <- data.frame(t(as(Stats,"matrix")))}
 	return(Stats)
-
 }
 
 
@@ -301,19 +296,81 @@ stats_model_func <- function(Fit.Model = NA, Test.df = data.frame(), RetDF = T, 
 ##################################################
 ##### PLOT FUNCTIONS FOR binary classifiers  #####
 
-plot_roc_simple_curve <- function(PredProbs, PredClass, RealClass, mcc_value){
-	# ROC curve
-	roc_curve <- pROC::roc(RealClass, PredProbs[,2], levels = levels(RealClass))
-	auc_value <- as.numeric(pROC::auc(roc_curve))
+plot_roc_simple_curve <- function(PredProbs, PredClass, RealClass, mcc_value) {
 	
-	# Create ROC plot
-	p_roc <- ggroc(roc_curve, size = 1.2, color = "steelblue") +
-		geom_abline(intercept = 1, slope = 1, linetype = "dashed", color = "gray50") +
-	    annotate("text", x = 0.2, y = 0.15, label = paste0("AUC = ", round(auc_value, 3)), size = 5) +
-	    annotate("text", x = 0.2, y = 0.1, label = paste0("MCC = ", round(mcc_value, 3)), size = 5) +
-	    theme_bw(base_size = 12) +
-	    labs(title = "ROC Curve", x = "Specificity", y = "Sensitivity") +
-	    theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+	if (class(RealClass) == "character") RealClass <- factor(RealClass)
+	if (class(PredClass) == "character") PredClass <- factor(PredClass)
+	n_classes <- length(levels(RealClass))
+	
+	if (n_classes == 2) {
+		# Binary ROC
+		roc_curve <- pROC::roc(RealClass, PredProbs[, 2], levels = levels(RealClass), quiet = TRUE)
+		auc_value <- as.numeric(pROC::auc(roc_curve))
+		
+		p_roc <- pROC::ggroc(roc_curve, size = 1.2, color = "steelblue") +
+			geom_abline(intercept = 1, slope = 1, linetype = "dashed", color = "gray50") +
+			annotate("text", x = 0.2, y = 0.15, label = paste0("AUC = ", round(auc_value, 3)), size = 5) +
+			annotate("text", x = 0.2, y = 0.10, label = paste0("MCC = ", round(mcc_value, 3)), size = 5) +
+			theme_bw(base_size = 12) +
+			labs(title = "ROC Curve", x = "Specificity", y = "Sensitivity") +
+			theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+		
+	} else {
+		# Multiclass ROC (One-vs-Rest)
+		classes <- levels(RealClass)
+		roc_list <- list()
+		auc_list <- c()
+		mcc_list <- c()
+		
+		for (this_class in classes) {
+			# ROC and AUC per class
+			binary_response <- ifelse(RealClass == this_class, 1, 0)
+			roc_list[[this_class]] <- pROC::roc(binary_response, PredProbs[, this_class], quiet = TRUE)
+			auc_list[this_class] <- as.numeric(pROC::auc(roc_list[[this_class]]))
+			
+			# MCC per class (One-vs-Rest) with NA handling
+			binary_pred <- ifelse(PredClass == this_class, 1, 0)
+			TP <- sum(binary_response == 1 & binary_pred == 1)
+			TN <- sum(binary_response == 0 & binary_pred == 0)
+			FP <- sum(binary_response == 0 & binary_pred == 1)
+			FN <- sum(binary_response == 1 & binary_pred == 0)
+			
+			# Check for edge cases
+			denom_parts <- c((TP + FP), (TP + FN), (TN + FP), (TN + FN))
+			if (any(denom_parts == 0)) {
+				mcc_list[this_class] <- 0
+			} else {
+				denom <- sqrt(prod(denom_parts))
+				mcc_list[this_class] <- ((TP * TN) - (FP * FN)) / denom
+			}
+		}
+		
+		# Median values (handle NAs)
+		median_auc <- median(auc_list, na.rm = TRUE)
+		median_mcc <- median(mcc_list, na.rm = TRUE)
+		
+		# Create legend labels with AUC and MCC per class
+		legend_labels <- paste0(
+			gsub("Enterotype\\.", "", classes),  # Shorter names
+			" (AUC=", round(auc_list, 2), 
+			", MCC=", round(mcc_list, 2), ")"
+		)
+		names(legend_labels) <- classes
+		
+		p_roc <- pROC::ggroc(roc_list, size = 1) +
+			geom_abline(intercept = 1, slope = 1, linetype = "dashed", color = "gray50") +
+			annotate("text", x = 0.3, y = 0.15, 
+				label = paste0("Median AUC = ", round(median_auc, 3), "\nMedian MCC = ", round(median_mcc, 3)), 
+				size = 4, hjust = 0) +
+			theme_bw(base_size = 12) +
+			labs(title = "ROC Curve (One-vs-Rest)", x = "Specificity", y = "Sensitivity", color = "Class") +
+			theme(
+				plot.title = element_text(hjust = 0.5, face = "bold"),
+				legend.position = "right"
+			) +
+			scale_color_brewer(palette = "Set1", labels = legend_labels)
+	}
+	
 	return(p_roc)
 }
 
@@ -342,7 +399,7 @@ plot_auc_function <- function(list_ggroc_curves=list(), list_ggroc_auc = c() , V
 			  labs(title = paste("AUC",Variable), 
 				subtitle = paste("Mean =", round(mean(list_ggroc_auc),digits=2) , "SD =", round(sd(list_ggroc_auc),digits=2) ) ) + 
 			  theme_bw()  # + scale_x_continuous(limits = c(0, 1))
-		ggsave(file = paste0(Variable,"_AUC_CV_lines.pdf"), AUCplotLines, width = 10, height = 7)
+		ggsave(file = paste0(Variable,"_AUC_CV_lines.pdf"), AUCplotLines, width = 13, height = 9)
 
 
 	}else{
@@ -736,70 +793,79 @@ smart_smote <- function(data, threshold = 1/5,
 ############################################
 
 #Imp_plot_discrete_function <- function(importance_df = data.frame(), MeanImp=data.frame(), MEspDF = data.frame() ){
-Imp_plot_discrete_function <- function(importance_df = data.frame(),  MEspDF = data.frame() ){
+Imp_plot_discrete_function <- function(importance_df = data.frame(), MEspDF = data.frame()) {
+	
 	#### Imp Plot #####
-	Mean = c(by(importance_df$Overall, importance_df$Feature , mean))
-	SD = c(by(importance_df$Overall, importance_df$Feature , sd))
-	Feature = names(Mean)
-	MeanImp <- data.frame( Feature, Mean, SD)
-
+	Mean <- c(by(importance_df$Overall, importance_df$Feature, mean))
+	SD <- c(by(importance_df$Overall, importance_df$Feature, sd))
+	Feature <- names(Mean)
+	MeanImp <- data.frame(Feature, Mean, SD)
+	
 	###  Direction of the taxa abundance  ####
-	Taxa2CompPhylo_df <- reshape2::melt(MEspDF)
-
+	Taxa2CompPhylo_df <- reshape2::melt(MEspDF, id.vars = "Variable")
+	N_levels <- length(unique(MEspDF$Variable))
+	
 	rank_diff_df <- data.frame()
-	for(i in MeanImp$Feature){
+	for (i in MeanImp$Feature) {
 		tempDF <- subset(Taxa2CompPhylo_df, variable == i)
-		if(length(unique(MEspDF$Variable)) == 2){
-			rank_diff_df <- rbind( rank_diff_df , data.frame( Feature = i , cont_res_wt(subDF = tempDF, 
-				discrete = "Variable",continuous = "value")) )
-		}else{
-			rank_diff_df <- rbind( rank_diff_df , data.frame( Feature = i , cont_res_kw(subDF = tempDF, 
-				discrete = "Variable",continuous = "value")) )	
+		
+		# Calculate dominant class (highest median abundance)
+		medians <- aggregate(value ~ Variable, data = tempDF, FUN = median)
+		dominant_class <- as.character(medians$Variable[which.max(medians$value)])
+		
+		# Statistical test
+		if (N_levels == 2) {
+			wt <- wilcox.test(value ~ Variable, data = tempDF)
+			p_value <- wt$p.value
+		} else {
+			kt <- kruskal.test(value ~ Variable, data = tempDF)
+			p_value <- kt$p.value
 		}
-		rm(tempDF)
+		
+		rank_diff_df <- rbind(rank_diff_df, data.frame(
+			Feature = i,
+			Dominant = dominant_class,
+			p.value = p_value
+		))
 	}
-
-
-	MeanImp$Increase <- rank_diff_df[match(MeanImp$Feature , rank_diff_df$Feature ) , ]$Dominant
-
-	rank_diff_df$q.value <- p.adjust(rank_diff_df$p.value,method="BH")
-
-	SigFeatures <- ifelse(rank_diff_df$q.value < 0.1,"*","")
+	
+	MeanImp$Increase <- rank_diff_df[match(MeanImp$Feature, rank_diff_df$Feature), "Dominant"]
+	rank_diff_df$q.value <- p.adjust(rank_diff_df$p.value, method = "BH")
+	SigFeatures <- ifelse(rank_diff_df$q.value < 0.1, "*", "")
 	names(SigFeatures) <- rank_diff_df$Feature
-	#MeanImp$Increase <- factor( as.character(MeanImp$Increase) , c(Val_Succ, Categories[!Categories %in% Val_Succ]) )
 	MeanImp$WTSignificant <- SigFeatures[match(MeanImp$Feature, names(SigFeatures))]
-
+	
 	#############################
 	#### Write the results  #####
-	write.table(rank_diff_df,"RankDiff_SelectedFeture_importance.tsv",col.names=T,row.names = F,quote=FALSE,sep = "\t")
-	write.table(MeanImp,"MeanImportance.tsv",col.names=T,row.names = F,quote=FALSE,sep = "\t")
-
+	write.table(rank_diff_df, "RankDiff_SelectedFeture_importance.tsv", col.names = TRUE, row.names = FALSE, quote = FALSE, sep = "\t")
+	write.table(MeanImp, "MeanImportance.tsv", col.names = TRUE, row.names = FALSE, quote = FALSE, sep = "\t")
+	
 	#################
 	#### Plots  #####
-	MeanImp$Feature <- paste(MeanImp$WTSignificant , MeanImp$Feature)
-	MeanImp <- MeanImp[order(MeanImp$Mean),]
-	MeanImp$Feature <- factor(as.character( MeanImp$Feature), as.character( MeanImp$Feature) )
-
-	p<- ggplot(MeanImp, aes(x=Feature, y=Mean, fill = Increase )) + 
-	  geom_bar(stat="identity" ) +
-	  geom_errorbar(aes(ymin=Mean-SD, ymax=Mean+SD), width=.2) +
-	  coord_flip() + theme_bw()  + ylab("Mean Relative Importance") +
-	  ggtitle(paste(Variable, "Feature Importance"))
-	 
-	if( length(unique(MEspDF$Variable))  == 2){  
-		p <- p + scale_fill_manual(values=c("blue","red"))
-	}  
-	#ggsave(file = "Imp.pdf", p, width = 7, height = 15)
-	ggsave(file = "Imp.pdf", p, width = 10, height = 15)
-
-	if(length(unique(MeanImp$Feature)) > 100){
-		ggsave(file = "Imp.pdf", p, width = 10, height = 17)
+	MeanImp$Feature <- paste(MeanImp$WTSignificant, MeanImp$Feature)
+	MeanImp <- MeanImp[order(MeanImp$Mean), ]
+	MeanImp$Feature <- factor(as.character(MeanImp$Feature), as.character(MeanImp$Feature))
+	
+	p <- ggplot(MeanImp, aes(x = Feature, y = Mean, fill = Increase)) + 
+		geom_bar(stat = "identity") +
+		geom_errorbar(aes(ymin = Mean - SD, ymax = Mean + SD), width = 0.2) +
+		coord_flip() + 
+		theme_bw() + 
+		ylab("Mean Relative Importance") +
+		ggtitle("Feature Importance")
+	
+	if (N_levels == 2) {
+		p <- p + scale_fill_manual(values = c("blue", "red"))
+	} else {
+		p <- p + scale_fill_brewer(palette = "Set1")
 	}
-
-	if(length(unique(MeanImp$Feature)) > 160){
-		ggsave(file = "Imp.pdf", p, width = 10, height = 20)
-	}
-
+	
+	# Adjust height
+	n_features <- length(unique(MeanImp$Feature))
+	plot_height <- ifelse(n_features > 160, 20, ifelse(n_features > 100, 17, 15))
+	ggsave(file = "Imp.pdf", p, width = 10, height = plot_height)
+	
+	return(p)
 }
 
 
@@ -1158,7 +1224,7 @@ train_final_model <- function(Best_features = c(), df_best_hyperparameter = data
   
 	# Handle class imbalance if needed
 	if (isTRUE(is_imbalanced)) { 
-		cat("\n Data imbalance \n")
+		cat("\n Data balanced \n")
 		Train_selected <- smart_smote(data = DF_TRAIN) 
 		BEST_MODEL <- train(Variable ~ ., data = Train_selected, method = ML_method, trControl = fitControl, tuneGrid = df_best_hyperparameter)
 	} else {

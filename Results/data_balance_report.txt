@@ -1,13 +1,13 @@
 === DATA BALANCE REPORT ===
 
 Status: BALANCED
-min/max ratio: 0.6111
+min/max ratio: 0.6622
 Threshold: 0.2 (1/5)
 
 Class distribution:
-   normal_vs_cirrhosis.cirrhosis : 216 (62.1%)
-   normal_vs_cirrhosis.normal : 132 (37.9%)
+   condition.control : 245 (39.8%)
+   condition.disease : 370 (60.2%)
 
-Total samples: 348
+Total samples: 615
 SMOTE applied: FALSE
-Date: 2025-12-29 09:18:55
+Date: 2026-01-07 16:26:31
