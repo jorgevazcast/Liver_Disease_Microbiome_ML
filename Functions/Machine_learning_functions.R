@@ -578,36 +578,36 @@ load_RData <- function(file) {
 	return(obj)
 }
 
-data_format <- function(in.obj, Variable,PrevCutoff = 0.2){
-
+data_format <- function(in.obj, Variable, PrevCutoff = 0.2){
 	if(class(in.obj) == "phyloseq"){
 		physeq_obj <- in.obj
+		
+		if(!taxa_are_rows(physeq_obj)){
+			warning("Taxa are in columns, transposing OTU table...")
+			otu_table(physeq_obj) <- otu_table(t(otu_table(physeq_obj)), taxa_are_rows = TRUE)
+		}
+		
 		Metadata <- data.frame(sample_data(physeq_obj))
 		Metadata$Variable <- Metadata[,colnames(Metadata) %in% Variable]
 		Metadata <- Metadata[complete.cases(Metadata$Variable),]
 	
-		ret_phylo <- prune_samples( rownames(Metadata), physeq_obj  )
-
+		ret_phylo <- prune_samples(rownames(Metadata), physeq_obj)
 		Prevalence <- microbiome::prevalence(ret_phylo)
-		in_phylo_filter <- prune_taxa( names(Prevalence[Prevalence >= PrevCutoff]) , ret_phylo)
-
+		in_phylo_filter <- prune_taxa(names(Prevalence[Prevalence >= PrevCutoff]), ret_phylo)
 		OTUs <- otu_table(in_phylo_filter)
-		Abundance_data <-  t(OTUs[,match(rownames(Metadata), colnames(OTUs))])
+		Abundance_data <- t(OTUs[, match(rownames(Metadata), colnames(OTUs))])
 			
-
 		if(all(rownames(Metadata) == rownames(Abundance_data))){
-			MEspDF<- data.frame(Variable = Metadata$Variable,Abundance_data)  
+			MEspDF <- data.frame(Variable = Metadata$Variable, Abundance_data)  
 			rownames(MEspDF) <- rownames(Metadata)	
 		}
 		else{
 			stop("Error: Not matching metadata and taxa table rownames")
 		}
-
 			
 	}
 	
 	return(MEspDF)
-
 }
 
 
