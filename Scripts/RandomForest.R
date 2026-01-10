@@ -174,6 +174,13 @@ for(i in seq_along(names(outer_loop))){
 		cat("N FEATURES: ", length(final_vars), "\n")
 		print("END Boruta")
 
+		### Handle zero features selected ###
+		if (length(final_vars) == 0) {
+			warning("Fold ", i, ": Boruta selected 0 features. Using all features instead.")
+			final_vars <- colnames(Train)
+			final_vars <- final_vars[!grepl("Variable", final_vars)]
+		}
+
 	}else{
 		final_vars <- colnames(Train)
 		final_vars <- final_vars[!grepl("Variable",final_vars)]	
