@@ -1,4 +1,4 @@
-# MLPredictR
+# Liver_Disease_Microbiome_ML
 Scripts for implementing Random Forest classification in R using the caret library with nested cross-validation, Boruta feature selection, and SHAP-based feature importance.
 
 ## Pipeline workflow
@@ -63,22 +63,78 @@ bash ml_classification_pipeline.sh
 ## Output Structure
 ```
 Results/
-├── infiles/
-│   ├── phylo_training_set.rds
-│   └── phylo_holdout_validation_set.rds
-├── RandomForest_FS_TRUE/
-│   ├── list_CV_models.rds                    # All CV fold models
-│   ├── stats_model.tsv                       # Per-fold metrics
-│   ├── Summary_Statistics_Nested_CV.tsv      # Aggregated CV stats
-│   ├── BEST_MODEL_NestCV.rds                 # Best model from nested CV
-│   ├── BEST_MODEL_NestCV_common_features.rds # Best model with common features
-│   ├── BEST_MODEL_outerloop_performance.rds  # Best model from outer loop
-│   ├── Metrics_CV_Boxplots.pdf               # Performance plots
-│   └── data_balance_report.txt               # Class balance info
-├── BEST_MODEL_*_stats/
-│   └── SHAP_*.pdf                            # SHAP importance plots
-└── *.tsv                                     # Validation results
+├── infiles/                                  # Partitioned data (from infile_partition.R)
+│   ├── phylo_training_set.rds               # Training set (70% of data)
+│   └── phylo_holdout_validation_set.rds     # Hold-out validation set (30% of data)
+│
+├── RandomForest_FS_TRUE/                    # Model outputs (FS_TRUE = Boruta feature selection enabled)
+│   │
+│   │ # ─── Cross-validation models ───
+│   ├── list_CV_models.rds                   # List of all 10 trained models from outer CV folds
+│   ├── outer_loop_cv_sample_index.rds       # Sample indices for each outer fold (reproducibility)
+│   │
+│   │ # ─── Best models (for prediction) ───
+│   ├── BEST_MODEL_NestCV.rds                # Best hyperparameters from nested CV, retrained on full data
+│   ├── BEST_MODEL_NestCV_common_features.rds # Same as above, using only features selected in ALL folds
+│   ├── BEST_MODEL_outerloop_performance.rds # Model from fold with best outer loop performance
+│   │
+│   │ # ─── Performance metrics ───
+│   ├── stats_model.tsv                      # Per-fold metrics (AUC, MCC, Accuracy, etc.)
+│   ├── stats_pooled_model.tsv               # Pooled predictions across all outer folds
+│   ├── Summary_Statistics_Nested_CV.tsv     # Mean ± SD of metrics across folds
+│   ├── Stats_CV_models_outer_loops.rds      # Detailed stats for model selection
+│   │
+│   │ # ─── Predictions ───
+│   ├── pooled_outer_loop_cv_predictions.rds # All test predictions from outer CV
+│   │
+│   │ # ─── Plots ───
+│   ├── Metrics_CV_Boxplots.pdf              # Boxplots of performance metrics across folds
+│   ├── pooled_outer_loop_roc_curve.pdf      # ROC curve plot (pooled predictions)
+│   ├── AUC_plot.pdf                         # AUC visualization per fold
+│   ├── Importance_plot.pdf                  # Feature importance barplot
+│   │
+│   │ # ─── Data reports ───
+│   ├── data_balance_report.txt              # Class distribution and imbalance assessment
+│   └── Different_models.txt                 # Performance differences between model strategies
+│
+├── BEST_MODEL_*_stats/                      # Validation results on hold-out set (from Predict_ML.R)
+│   ├── confusion_matrix.tsv                 
+│   ├── performance_metrics.tsv              
+│   └── predictions.rds                      
+│
+└── SHAP_*/                                  # SHAP analysis (from SHAP_biomarker_importance.R)
+    ├── SHAP_object.rds                      
+    └── SHAP_Imp.pdf                         
 ```
+
+### Best Models for Prediction
+
+| Model | Description | Use case |
+|-------|-------------|----------|
+| `BEST_MODEL_outerloop_performance.rds` | Model from CV fold with highest AUC/MCC | Best empirical performance |
+| `BEST_MODEL_NestCV.rds` | Best hyperparameters from nested CV, retrained on all training data | Recommended for new predictions |
+| `BEST_MODEL_NestCV_common_features.rds` | Same as above, but uses only features selected in ALL CV folds | Most robust/generalizable |
+
+### How to Use Best Models
+```r
+# Load a best model
+model <- readRDS("RandomForest_FS_TRUE/BEST_MODEL_outerloop_performance.rds")
+
+# Predict on new data
+predictions <- predict(model, newdata = new_data)
+```
+
+
+### Key Output Files Explained
+
+| File | Description |
+|------|-------------|
+| `list_CV_models.rds` | Contains all 10 Random Forest models trained during nested CV outer loop |
+| `stats_model.tsv` | Performance metrics (AUC, MCC, Accuracy, Kappa, F1, Sensitivity, Specificity) for each CV fold |
+| `Summary_Statistics_Nested_CV.tsv` | Aggregated statistics: mean, SD, median, IQR across all folds |
+| `pooled_outer_loop_cv_predictions.rds` | Combined test set predictions from all outer folds for unbiased evaluation |
+| `data_balance_report.txt` | Reports if classes are imbalanced (>1:5 ratio triggers SMOTE) |
+| `importance_df.rds` | Feature importance from each fold, used for consensus importance plots |
 
 ## Input Data Format
 
