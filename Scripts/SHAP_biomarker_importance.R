@@ -10,9 +10,9 @@ args<-commandArgs(TRUE)
 #library(phyloseq)
 
 # Load your phyloseq object and model
-#inphylo <- readRDS("/home/luna.kuleuven.be/u0141268/Dropbox/Jiyeon_Jorge/research/research_liver_diseases/Predcition_ML/infiles/in_phylo_ASV_prop.rds")
-outdir <- as.character(args[1]) # indir <- "/home/luna.kuleuven.be/u0141268/Dropbox/Jiyeon_Jorge/research/research_liver_diseases/Predcition_ML/PREDICTIONS//shotgun_Species/normal_vs_liver_cancer/Ret_abundance/RandomForest_FS_TRUE"
-infileModel <- as.character(args[2])  #infileModel <- "./RandomForest_FS_TRUE/BEST_MODEL_outerloop_performance.rds"
+
+outdir <- as.character(args[1]) 
+infileModel <- as.character(args[2])
 Bmodel <- readRDS(infileModel)
 
 print(outdir)

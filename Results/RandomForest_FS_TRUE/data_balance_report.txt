@@ -1,13 +1,13 @@
 === DATA BALANCE REPORT ===
 
 Status: BALANCED
-min/max ratio: 0.6622
+min/max ratio: 0.6632
 Threshold: 0.2 (1/5)
 
 Class distribution:
-   condition.control : 245 (39.8%)
-   condition.disease : 370 (60.2%)
+   condition.control : 191 (39.9%)
+   condition.disease : 288 (60.1%)
 
-Total samples: 615
+Total samples: 479
 SMOTE applied: FALSE
-Date: 2026-01-07 16:39:41
+Date: 2026-01-27 15:38:18

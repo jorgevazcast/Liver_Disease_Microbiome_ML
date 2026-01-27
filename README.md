@@ -8,16 +8,19 @@ Scripts for Implementing different Machine Learning Algorithms in R using the ca
 ## Requirements
 
 - [caret](https://cran.r-project.org/web/packages/caret/index.html)
+- [coin](https://cran.r-project.org/web/packages/coin/index.html/) 
 - [phyloseq](https://www.bioconductor.org/packages/release/bioc/html/phyloseq.html)
 - [doParallel](https://cran.r-project.org/web/packages/doParallel/index.html) 
 - [Boruta](https://cran.r-project.org/web/packages/Boruta/index.html) 
-- [xgboost](https://cran.r-project.org/web/packages/xgboost/index.html) 
 - [pROC](https://cran.r-project.org/web/packages/pROC/index.html) 
 - [microbiome](https://www.bioconductor.org/packages/release/bioc/html/microbiome.html) 
 - [cvAUC](https://cran.r-project.org/web/packages/cvAUC/index.html) 
 - [ggplot2](https://cran.r-project.org/web/packages/ggplot2/index.html) 
 - [ggpubr](https://cran.r-project.org/web/packages/ggpubr/index.html) 
 - [DMwR](https://cran.r-project.org/src/contrib/Archive/DMwR/) 
+- [fastshap](https://cran.r-project.org/web/packages/fastshap/index.html/) 
+- [rstatix](https://cran.r-project.org/web/packages/rstatix/index.html/) 
+- [shapviz](https://cran.r-project.org/web/packages/shapviz/index.html/) 
 
 ## Quick Start
 
@@ -134,8 +137,6 @@ Rscript --vanilla $Plot_RMSE_importance $infile $Variable $PrevCutoff $Dir_Resul
 - Sensitivity, Specificity, Precision
 - PPV, NPV
 
-**Regression:**
-- RMSE, R², MAE
 
 ## Citation
 

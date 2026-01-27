@@ -1,180 +1,123 @@
 #!/bin/bash
-
+set -e  # Exit on error
 
 ################################################################################
 #                    MACHINE LEARNING PIPELINE - RANDOM FOREST                 #
 #                                                                              #
-# Description: Trains a Random Forest classifier using nested cross-validation #
-#              with feature selection and SMOTE balancing for microbiome data  #
+# Trains a Random Forest classifier using nested cross-validation with         #
+# Boruta feature selection and SMOTE balancing for microbiome data.            #
 #                                                                              #
+# Usage: bash ml_classification_pipeline.sh                                    #
 # Author: Jorge Francisco Vázquez Castellanos                                  #
-# Date: [Date]                                                                 #
 ################################################################################
 
-### sh ml_classification_pipeline.sh
+####################################################################################
+#                              SETUP & PARAMETERS                                  #
+####################################################################################
 
-####################################################################################
-#                           GLOBAL VARIABLES                                       #
-####################################################################################
-mkdir Results
+# Working directory
+HOMEC=$(pwd)
+
+# Scripts paths
+infile_partition="$HOMEC/Scripts/infile_partition.R"
+ML_method_rf="$HOMEC/Scripts/RandomForest.R"
+Best_model="$HOMEC/Scripts/Best_model.R"
+Predict_ML="$HOMEC/Scripts/Predict_ML.R"
+SHAP_biomarker_importance="$HOMEC/Scripts/SHAP_biomarker_importance.R"
+DIR_FUNCTIONS="$HOMEC/Functions"
+
+# Verify required files exist
+for script in "$infile_partition" "$ML_method_rf" "$Best_model" "$Predict_ML" "$SHAP_biomarker_importance"; do
+    [ -f "$script" ] || { echo "Error: $script not found"; exit 1; }
+done
+[ -f "$DIR_FUNCTIONS/Machine_learning_functions.R" ] || { echo "Error: Machine_learning_functions.R not found"; exit 1; }
+
+# Input data
+infile="$HOMEC/Test_data/in_phylo.rds"
+[ -f "$infile" ] || { echo "Error: $infile not found"; exit 1; }
+
+# Model parameters
+Variable="condition"          # Target variable (column in metadata)
+PrevCutoff=0.2                # Prevalence filter (20%)
+ncores=15                     # CPU cores for model training
+hold_out_size=0.3             # Hold-out set proportion (30%)
+Feature_selection=TRUE        # Boruta feature selection (TRUE/FALSE)
+
+# Output directories
+mkdir -p Results
 cd Results
-
-# Home directory - use $HOME for current user
-HOMEC=$HOME
-
-# Path to the Functions directory containing Machine_learning_functions.R
-DIR_FUNCTIONS=$HOMEC"/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Functions"
-# NOTE: MODIFY THIS PATH to match your local repository location
-
-# Prevalence cutoff for feature filtering (0-1)
-# Features present in fewer than this proportion of samples will be removed
-PrevCutoff=0.2  # 20% prevalence threshold
-
-# Number of CPU cores for parallel processing
-ncores=15
-
-# Size for the hold-out partition
-hold_out_size=0.1
-
-# Feature selection flag
-# TRUE = Apply Boruta feature selection within each CV fold
-# FALSE = Use all features (after prevalence filtering)
-Feature_selection=T
+MODEL_DIR="./RandomForest_FS_${Feature_selection}"
 
 ####################################################################################
-#                           SCRIPT PATHS                                           #
+#                         1. DATA PARTITION                                        #
 ####################################################################################
 
-# Path to the file for the file partitions
-infile_partition=$HOMEC"/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Scripts/infile_partition.R"
-
-# Path to Random Forest training script
-ML_method_rf=$HOMEC"/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Scripts/RandomForest.R"
-
-# Path to the script for the best model estimation
-Best_model=$HOMEC"/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Scripts/Best_model.R"
-
-# Path to prediction script (for external validation)
-Predict_ML=$HOMEC"/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Scripts/Predict_ML.R"
+echo "=== 1. Partitioning data ==="
+Rscript --vanilla "$infile_partition" "$infile" "$Variable" "$hold_out_size"
 
 ####################################################################################
-#                           INPUT DATA                                             #
+#                         2. MODEL TRAINING                                        #
 ####################################################################################
 
-# Input phyloseq object (.rds format)
-# Should contain microbiome abundance data and metadata with target variable
-infile=../Test_data/in_phylo.rds
-
-# Target variable for classification
-# Must match a column name in the phyloseq metadata
-Variable="condition"
-
-####################################################################################
-#                     Parition dataset                                             #
-####################################################################################
-
-Rscript --vanilla $infile_partition $infile $Variable $hold_out_size
-
-####################################################################################
-#                        MODEL TRAINING - RANDOM FOREST                            #
-####################################################################################
-
-# Train Random Forest model with nested cross-validation
-# 
-# Arguments:
-#   1. $infile             - Input phyloseq object (.rds or .RData)
-#   2. $Variable           - Target variable name (from metadata)
-#   3. $PrevCutoff         - Prevalence threshold (0-1)
-#   4. $Feature_selection  - Enable Boruta feature selection (TRUE/FALSE)
-#   5. $ncores             - Number of cores for parallel processing
-#   6. $DIR_FUNCTIONS      - Path to Functions directory
-#
-# Outputs:
-#   - list_CV_models.rds              - All trained CV models
-#   - stats_model.tsv                 - Performance metrics per fold
-#   - Summary_Statistics_Nested_CV.tsv - Aggregated CV performance
-#   - BEST_MODEL_FULL.rds             - Final model (no SMOTE)
-#   - BEST_MODEL_FULL_BALANCED.rds    - Final model (with SMOTE if imbalanced)
-#   - Metrics_CV_Boxplots.pdf         - Performance visualization
-#   - data_balance_report.txt         - Class balance information
-
-echo "================================"
-echo "Starting Random Forest Training"
-echo "================================"
-echo "Input file: $infile"
-echo "Variable: $Variable"
-echo "Prevalence cutoff: $PrevCutoff"
-echo "Feature selection: $Feature_selection"
-echo "Cores: $ncores"
-echo "================================"
-
-Rscript --vanilla $ML_method_rf \
+echo "=== 2. Training Random Forest ==="
+Rscript --vanilla "$ML_method_rf" \
     ./infiles/phylo_training_set.rds \
-    $Variable \
-    $PrevCutoff \
-    $Feature_selection \
-    $ncores \
-    $DIR_FUNCTIONS
+    "$Variable" \
+    "$PrevCutoff" \
+    "$Feature_selection" \
+    "$ncores" \
+    "$DIR_FUNCTIONS"
 
+####################################################################################
+#                         3. BEST MODEL SELECTION                                  #
+####################################################################################
 
-###########################################################################
-#                     Train the best model                                #
-###########################################################################
-
-echo "================================"
-echo "Train the best model"
-echo "================================"
-echo "Input file: $infile"
-echo "Variable: $Variable"
-echo "Prevalence cutoff: $PrevCutoff"
-echo "Feature selection: $Feature_selection"
-echo "Cores: $ncores"
-echo "================================"
-
-Rscript --vanilla $Best_model \
+echo "=== 3. Selecting best model ==="
+Rscript --vanilla "$Best_model" \
     ./infiles/phylo_training_set.rds \
-    $Variable \
-    $PrevCutoff \
-    $ncores \
-    $DIR_FUNCTIONS \
-    ./RandomForest_FS_TRUE \
+    "$Variable" \
+    "$PrevCutoff" \
+    "$ncores" \
+    "$DIR_FUNCTIONS" \
+    "$MODEL_DIR" \
     "rf"
-    
-
 
 ####################################################################################
-#                     OPTIONAL: EXTERNAL VALIDATION                                #
+#                         4. EXTERNAL VALIDATION                                   #
 ####################################################################################
 
+echo "=== 4. External validation ==="
 external_dataset="./infiles/phylo_holdout_validation_set.rds"
-# 
-Rscript --vanilla $Predict_ML \
-     $external_dataset \
-     $Variable \
-     "./RandomForest_FS_TRUE/BEST_MODEL_outerloop_performance.rds" \
-     "BEST_MODEL_outerloop_performance_stats"\
-     $DIR_FUNCTIONS
+models=("BEST_MODEL_outerloop_performance" "BEST_MODEL_NestCV" "BEST_MODEL_NestCV_common_features")
 
-Rscript --vanilla $Predict_ML \
-     $external_dataset \
-     $Variable \
-     "./RandomForest_FS_TRUE/BEST_MODEL_NestCV.rds" \
-     "BEST_MODEL_NestCV_stats"\
-     $DIR_FUNCTIONS
-     
-Rscript --vanilla $Predict_ML \
-     $external_dataset \
-     $Variable \
-     "./RandomForest_FS_TRUE/BEST_MODEL_NestCV_common_features.rds" \
-     "BEST_MODEL_NestCV_common_features_stats"\
-     $DIR_FUNCTIONS
-          
+for model in "${models[@]}"; do
+    Rscript --vanilla "$Predict_ML" \
+        "$external_dataset" \
+        "$Variable" \
+        "${MODEL_DIR}/${model}.rds" \
+        "${model}_stats" \
+        "$DIR_FUNCTIONS"
+done
 
-################################################################################
-#                              END OF SCRIPT                                    #
-################################################################################
+####################################################################################
+#                         5. SHAP ANALYSIS (PARALLEL)                              #
+####################################################################################
 
+echo "=== 5. SHAP feature importance (parallel) ==="
+Ncores_shap=3
 
+# Build combinations: outdir|inmodel
+combinations=()
+for model in "${models[@]}"; do
+    combinations+=("./${model}_stats|${MODEL_DIR}/${model}.rds")
+done
 
+# Run in parallel
+printf "%s\n" "${combinations[@]}" | xargs -P "$Ncores_shap" -I {} bash -c '
+    outdir="${1%|*}"
+    inmodel="${1#*|}"
+    echo "Processing: $inmodel"
+    Rscript --vanilla '"$SHAP_biomarker_importance"' "$outdir" "$inmodel"
+' _ {}
 
-
+echo "=== Pipeline completed ==="
