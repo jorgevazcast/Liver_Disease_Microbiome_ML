@@ -1,5 +1,5 @@
 # MLPredictR
-Scripts for Implementing different Machine Learning Algorithms in R using the caret Library. The repository is currently under development, and additional algorithms may be included in the future. At present, it features implementations of Random Forest, GLMNet, and XGBoost.
+Scripts for implementing Random Forest classification in R using the caret library with nested cross-validation, Boruta feature selection, and SHAP-based feature importance.
 
 ## Pipeline workflow
 ![ML Classification Pipeline](images/Raw_pipeline.png)
@@ -26,26 +26,23 @@ Scripts for Implementing different Machine Learning Algorithms in R using the ca
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/Liver_Disease_Microbiome_ML.git
+git clone https://github.com/jorgevazcast/Liver_Disease_Microbiome_ML.git
 cd Liver_Disease_Microbiome_ML
 ```
 
 ### 2. Configure the pipeline
-Edit `ml_classification_pipeline.sh` and modify these variables:
 
+Edit `ml_classification_pipeline.sh` and modify these parameters:
 ```bash
-# Path to Functions directory (REQUIRED)
-DIR_FUNCTIONS=$HOME"/github_shared_code_and_publications/Liver_Disease_Microbiome_ML/Functions"
-
 # Input data
-infile=../Test_data/in_phylo.rds  # Your phyloseq object
-Variable="condition"               # Target variable in metadata
+infile="$HOMEC/Test_data/in_phylo.rds"  # Your phyloseq object
 
-# Parameters
-PrevCutoff=0.2          # Prevalence filter (20%)
-ncores=15               # CPU cores
-hold_out_size=0.1       # Hold-out set proportion (10%)
-Feature_selection=T     # Boruta feature selection (T/F)
+# Model parameters
+Variable="condition"          # Target variable (column in metadata)
+PrevCutoff=0.2                # Prevalence filter (20%)
+ncores=15                     # CPU cores for model training
+hold_out_size=0.3             # Hold-out set proportion (30%)
+Feature_selection=TRUE        # Boruta feature selection (TRUE/FALSE)
 ```
 
 ### 3. Run the pipeline
@@ -55,88 +52,47 @@ bash ml_classification_pipeline.sh
 
 ## Pipeline Steps
 
-The pipeline executes three main steps:
-
 | Step | Script | Description |
 |------|--------|-------------|
-| 1 | `infile_partition.R` | Splits data into training (90%) and hold-out (10%) sets |
+| 1 | `infile_partition.R` | Splits data into training and hold-out sets |
 | 2 | `RandomForest.R` | Trains RF with nested CV + optional Boruta feature selection |
 | 3 | `Best_model.R` | Selects and retrains best model on full training set |
-| 4 | `Predict_ML.R` | Validates on hold-out set (optional) |
+| 4 | `Predict_ML.R` | Validates models on hold-out set |
+| 5 | `SHAP_biomarker_importance.R` | Computes SHAP values for feature importance |
 
-## Output Files
-
+## Output Structure
 ```
 Results/
 ├── infiles/
 │   ├── phylo_training_set.rds
 │   └── phylo_holdout_validation_set.rds
 ├── RandomForest_FS_TRUE/
-│   ├── list_CV_models.rds              # All CV fold models
-│   ├── stats_model.tsv                 # Per-fold metrics
-│   ├── Summary_Statistics_Nested_CV.tsv # Aggregated CV stats
-│   ├── BEST_MODEL_NestCV.rds           # Best model from CV
-│   ├── BEST_MODEL_outerloop_performance.rds
-│   ├── Metrics_CV_Boxplots.pdf         # Performance plots
-│   └── data_balance_report.txt         # Class balance info
-└── *.tsv                               # Validation results
+│   ├── list_CV_models.rds                    # All CV fold models
+│   ├── stats_model.tsv                       # Per-fold metrics
+│   ├── Summary_Statistics_Nested_CV.tsv      # Aggregated CV stats
+│   ├── BEST_MODEL_NestCV.rds                 # Best model from nested CV
+│   ├── BEST_MODEL_NestCV_common_features.rds # Best model with common features
+│   ├── BEST_MODEL_outerloop_performance.rds  # Best model from outer loop
+│   ├── Metrics_CV_Boxplots.pdf               # Performance plots
+│   └── data_balance_report.txt               # Class balance info
+├── BEST_MODEL_*_stats/
+│   └── SHAP_*.pdf                            # SHAP importance plots
+└── *.tsv                                     # Validation results
 ```
 
 ## Input Data Format
 
 The input must be a **phyloseq object** (.rds) containing:
+
 - `otu_table`: Feature abundance matrix
 - `sample_data`: Metadata with the target variable
 - `tax_table`: (optional) Taxonomy information
 
-## Classification Examples
-
-### Random Forest with Feature Selection
-```bash
-ML_method=$HOME"/github_projects/mlpredictr/Scripts/RandomForest.R"
-Feature_selection=T
-
-Rscript --vanilla $ML_method $infile $Variable $PrevCutoff $Feature_selection $ncores $DIR_FUNCTIONS
-```
-
-### XGBoost
-```bash
-ML_method=$HOME"/github_projects/mlpredictr/Scripts/XGboost.R"
-Feature_selection=F
-GridMatrix="xgbGrid_small"  # Options: xgbGrid_small, xgbGrid_mid, xgbGrid_large
-
-Rscript --vanilla $ML_method $infile $Variable $PrevCutoff $Feature_selection $ncores $GridMatrix $DIR_FUNCTIONS
-```
-
-### GLMNet
-```bash
-ML_method=$HOME"/github_projects/mlpredictr/Scripts/glmnet.R"
-Feature_selection=T
-
-Rscript --vanilla $ML_method $infile $Variable $PrevCutoff $Feature_selection $ncores $DIR_FUNCTIONS
-```
-
-## Regression
-
-For continuous variables, the best model minimizes RMSE:
-
-```bash
-Variable="moisture"  # Continuous variable
-
-# Use same scripts - they auto-detect regression vs classification
-Rscript --vanilla $ML_method $infile $Variable $PrevCutoff $Feature_selection $ncores $DIR_FUNCTIONS
-
-# Plot results
-Rscript --vanilla $Plot_RMSE_importance $infile $Variable $PrevCutoff $Dir_Results $DIR_FUNCTIONS
-```
-
 ## Performance Metrics
 
-**Classification:**
 - AUC, Accuracy, Kappa, MCC, F1-score
 - Sensitivity, Specificity, Precision
 - PPV, NPV
-
 
 ## Citation
 
@@ -147,29 +103,9 @@ If you use this pipeline, please cite:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - Copyright (c) 2025 Jorge Francisco Vázquez Castellanos
 
-MIT License
-
-Copyright (c) 2025 Jorge Francisco Vázquez Castellanos
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+See [LICENSE](LICENSE) for details.
 
 ## Contact
 
