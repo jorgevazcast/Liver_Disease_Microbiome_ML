@@ -26,9 +26,9 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
-     inkscape:zoom="1.0280428"
-     inkscape:cx="180.43995"
-     inkscape:cy="446.47946"
+     inkscape:zoom="1.0880524"
+     inkscape:cx="252.28564"
+     inkscape:cy="423.69282"
      inkscape:window-width="1850"
      inkscape:window-height="1016"
      inkscape:window-x="70"
@@ -2913,23 +2913,26 @@
     </g>
     <g
        id="g27"
-       transform="translate(3.7179113,4.3229501)">
-      <path
-         id="path162-2-2"
-         d="m -110.50781,-34.5 h 221.01563 v 69 h -221.01563 z"
-         style="fill:#e1f5fe;fill-opacity:1;fill-rule:nonzero;stroke:#0288d1;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
-         transform="matrix(0.10719792,0,0,0.0507384,70.316678,100.74644)"
-         clip-path="url(#clipPath163-7-5)" />
-      <text
-         id="text175"
-         xml:space="preserve"
-         transform="matrix(0.16852471,0,0,0.16852471,59.233669,101.52949)"
-         clip-path="url(#clipPath176)"><tspan
-           style="font-variant:normal;font-weight:normal;font-size:13px;font-family:'Liberation Sans';writing-mode:lr-tb;fill:#01579b;fill-opacity:1;fill-rule:nonzero;stroke:none"
-           x="0 8.6708984 15.170898 18.782715 26.012695 30.341797 37.571777 44.801758 47.689941 51.301758 59.007812 66.237793 69.125977 72.01416 79.244141 86.474121 90.085938 92.974121 100.2041 107.43408 111.0459 119.7168 126.94678"
-           y="0"
-           sodipodi:role="line"
-           id="tspan175">External Validation Set</tspan></text>
+       transform="translate(8.6301428,4.3229501)">
+      <g
+         id="g1">
+        <path
+           id="path162-2-2"
+           d="m -110.50781,-34.5 h 221.01563 v 69 h -221.01563 z"
+           style="fill:#e1f5fe;fill-opacity:1;fill-rule:nonzero;stroke:#0288d1;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
+           transform="matrix(0.07155263,0,0,0.05093361,65.404446,100.74644)"
+           clip-path="url(#clipPath163-7-5)" />
+        <text
+           id="text175"
+           xml:space="preserve"
+           transform="matrix(0.16852471,0,0,0.16852471,59.233669,101.52949)"
+           clip-path="url(#clipPath176)"><tspan
+             style="font-variant:normal;font-weight:normal;font-size:13px;font-family:'Liberation Sans';writing-mode:lr-tb;fill:#01579b;fill-opacity:1;fill-rule:nonzero;stroke:none"
+             sodipodi:role="line"
+             id="tspan175"
+             x="0"
+             y="0">Hold-out Set</tspan></text>
+      </g>
     </g>
     <path
        id="path162"
@@ -3329,9 +3332,9 @@
          style="white-space:pre;inline-size:123.201;display:inline"><tspan
            x="0"
            y="0"
-           id="tspan6"><tspan
+           id="tspan2"><tspan
              style="font-size:13px;font-family:'Liberation Sans';fill:#01579b"
-             id="tspan5">Outer Loop </tspan></tspan></text>
+             id="tspan1">Outer Loop </tspan></tspan></text>
       <text
          id="text180"
          xml:space="preserve"
@@ -4119,7 +4122,7 @@
        id="path93-1-7-5-1-0-0-1-1"
        d="m 661.30499,747.57898 v 4.16699 c 0,4.16705 0,12.5 0,20.83301 0,8.33404 0,16.66699 0,25 0,8.33404 0,16.66699 0,25 0,8.33404 0,16.66699 0,24.33404 0,7.66596 0,14.66596 0,18.16596 v 3.5"
        style="fill:none;stroke:#0288d1;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none;stroke-opacity:1"
-       transform="matrix(0,0.16855114,-0.83159157,0,808.21209,-6.1970181)"
+       transform="matrix(0,0.16855114,-0.86343602,0,832.01833,-6.1970181)"
        clip-path="url(#clipPath94-8-9-7-5-8-8-7-4)" />
     <path
        id="path93-1-7-5-1-0-0-1-1-1"
@@ -4718,8 +4721,8 @@
        style="font-size:18.6667px;font-family:'Liberation Sans';-inkscape-font-specification:'Liberation Sans';text-align:center;letter-spacing:0px;word-spacing:0px;white-space:pre;shape-inside:url(#rect3);display:inline;fill:#ffffff;fill-opacity:0;stroke:#800080;stroke-width:0.336378"><tspan
          x="103.83086"
          y="30.90591"
-         id="tspan8"><tspan
+         id="tspan4"><tspan
            style="fill:#000000;fill-opacity:1;stroke:#ffffff"
-           id="tspan7">ML Classiﬁcation Pipeline</tspan></tspan></text>
+           id="tspan3">ML Classiﬁcation Pipeline</tspan></tspan></text>
   </g>
 </svg>
