@@ -7,7 +7,7 @@ set -e  # Exit on error
 # Trains a Random Forest classifier using nested cross-validation with         #
 # Boruta feature selection and SMOTE balancing for microbiome data.            #
 #                                                                              #
-# Usage: bash ml_classification_pipeline.sh                                    #
+# Usage: bash ml_classification_pipeline_LOCO_CV.sh                            #
 # Author: Jorge Francisco Vázquez Castellanos                                  #
 ################################################################################
 
@@ -47,8 +47,8 @@ Feature_selection=TRUE        # Boruta feature selection (TRUE/FALSE)
 # Output directories
 mkdir -p Results_LOCO_CV
 cd Results_LOCO_CV
-mkdir -p $Cohort2Exclude
-cd $Cohort2Exclude
+mkdir -p $LO_Cohort
+cd $LO_Cohort
 MODEL_DIR="./RandomForest_FS_${Feature_selection}"
 
 ####################################################################################
