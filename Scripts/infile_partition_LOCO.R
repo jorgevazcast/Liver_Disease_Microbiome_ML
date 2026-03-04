@@ -5,10 +5,9 @@ library(microbiome)
 
 args<-commandArgs(TRUE)
 
-infile <- as.character(args[1]) #        infile <- "~/Liver_Disease_Microbiome_ML/Test_data/in_phylo.rds"
-Variable <- as.character(args[2]) #     Variable <- "normal_vs_cirrhosis"
-hold_out_size <- as.numeric(as.character(args[3])) # hold_out_size <- 0.2
-
+infile <- as.character(args[1])   # infile   <- "/Liver_Disease_Microbiome_ML/Test_data/in_phylo_LOCO_CV.rds"
+Variable <- as.character(args[2]) # Variable <- "condition"
+Cohort <-  as.character(args[3])  # Cohort <-  "cohort_1"
 
 
 # Load phyloseq and extract metadata
@@ -24,15 +23,9 @@ all_phylo <- prune_samples(rownames(Metadata), all_phylo)
 all_taxa <- taxa_sums(all_phylo)
 all_phylo <- prune_taxa(names(all_taxa[all_taxa != 0]), all_phylo)
 
-# Create stratified split
-holdout_index <- createDataPartition(
-    y = Metadata$Variable, 
-    p = hold_out_size, 
-    list = FALSE
-)
-
-training_phylo <- prune_samples(rownames(Metadata)[-holdout_index], all_phylo)
-holdout_phylo <- prune_samples(rownames(Metadata)[holdout_index], all_phylo)
+# Subset the cohort
+training_phylo <- subset_samples(all_phylo, cohort!=Cohort)
+holdout_phylo <- subset_samples(all_phylo, cohort==Cohort)
 
 # Remove taxa with zero abundance in each set separately
 # (some taxa may become zero after split)

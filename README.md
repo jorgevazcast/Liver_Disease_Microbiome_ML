@@ -45,10 +45,18 @@ hold_out_size=0.3             # Hold-out set proportion (30%)
 Feature_selection=TRUE        # Boruta feature selection (TRUE/FALSE)
 ```
 
-### 3. Run the pipeline
+### 3. Run — Standard cross-validation
 ```bash
 bash ml_classification_pipeline.sh
 ```
+
+### 4. Run — Leave-One-Cohort-Out cross-validation (LOCO-CV)
+```bash
+bash ml_classification_pipeline_LOCO_CV.sh
+```
+> Use LOCO-CV when your dataset spans multiple cohorts and you want to assess
+> whether the model generalises across cohort-specific batch effects.
+
 
 ## Pipeline Steps
 
