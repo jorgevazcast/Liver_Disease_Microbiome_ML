@@ -162,7 +162,7 @@ The input must be a **phyloseq object** (.rds) containing:
 
 If you use this pipeline, please cite:
 ```
-[Add citation here]
+Vázquez-Castellanos JF, Yoon SJ, Won S-M, Raes J, Kwon HC, Si J, Suk KT. Stage-dependent gut microbiome and functional signatures across the liver disease spectrum: an integrative multi-cohort study. Gut. Accepted for publication
 ```
 
 ## License
